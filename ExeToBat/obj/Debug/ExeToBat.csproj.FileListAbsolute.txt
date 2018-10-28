@@ -1,0 +1,7 @@
+D:\Bibliotheken\Documents\Visual Studio 2017\Projects\ExeToBat\ExeToBat\bin\Debug\ExeToBat.exe.config
+D:\Bibliotheken\Documents\Visual Studio 2017\Projects\ExeToBat\ExeToBat\bin\Debug\ExeToBat.exe
+D:\Bibliotheken\Documents\Visual Studio 2017\Projects\ExeToBat\ExeToBat\bin\Debug\ExeToBat.pdb
+D:\Bibliotheken\Documents\Visual Studio 2017\Projects\ExeToBat\ExeToBat\obj\Debug\ExeToBat.csproj.CoreCompileInputs.cache
+D:\Bibliotheken\Documents\Visual Studio 2017\Projects\ExeToBat\ExeToBat\obj\Debug\ExeToBat.exe
+D:\Bibliotheken\Documents\Visual Studio 2017\Projects\ExeToBat\ExeToBat\obj\Debug\ExeToBat.pdb
+D:\Bibliotheken\Documents\Visual Studio 2017\Projects\ExeToBat\ExeToBat\obj\Debug\ExeToBat.csprojAssemblyReference.cache

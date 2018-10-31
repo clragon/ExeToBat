@@ -157,7 +157,7 @@ namespace ExeToBat
 
                     case var i when i.Equals("Delete"):
                         Sources.Remove(source);
-                        break;
+                        return true;
 
                     default:
                         ResetInput();

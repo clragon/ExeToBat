@@ -49,7 +49,7 @@ namespace ExeToBat
                 return false;
             }
 
-            ListToMenu(options, DisplayTitle, DisplayOption, ChoiceMethod, true, "Exit");
+            ListToMenu(options, DisplayTitle, DisplayOption, ChoiceMethod, BackString:"Exit");
         }
 
         static void ChooseSource()
@@ -172,12 +172,20 @@ namespace ExeToBat
         static void ModifySource(SourceFile source)
         {
 
-            List<string> options = new List<string> { "File", "Execute after extraction", "Extraction directory", "Parameters" };
+            List<string> options() {
+                List<string> opts = new List<string> { "File", "Extraction directory", "Execute after extraction" };
+                if (source.Execute) { opts.AddRange( new List<string> { "Parameters", "Wait for exit" } ); }
+                if (source.Wait) { opts.Add("Delete after execution");  }
+                return opts;
+            }
+            
 
             Dictionary<string, string> ValueMap = new Dictionary<string, string>
             {
                 { "File", "File" },
                 { "Execute after extraction", "Execute" },
+                { "Wait for exit", "Wait"},
+                { "Delete after execution", "Delete"},
                 { "Extraction directory", "Directory" },
                 { "Parameters", "Parameters" },
             };
@@ -187,11 +195,13 @@ namespace ExeToBat
                 Console.WriteLine("ExeToBat > Main > Files > {0} > Edit", Path.GetFileName(source.File));
             }
 
-            int MaxLength = options.Select(x => x.Length).Max();
+            int MaxLength = options().Select(x => x.Length).Max();
             void DisplayOption(List<string> Options, string o, int index, int i)
             {
                 Console.WriteLine("[{0}] {1} | {2}", i, o.PadRight(MaxLength, ' '), source.GetType().GetProperty(ValueMap[o]).GetValue(source).ToString());
             }
+
+            bool ZeroMethod() { ResetInput(); return false; }
 
             bool ChoiceMethod(List<string> Options, int index)
             {
@@ -213,6 +223,14 @@ namespace ExeToBat
                         EditParameters(source);
                         break;
 
+                    case var i when i.Equals("Wait for exit"):
+                        source.Wait = !source.Wait;
+                        break;
+
+                    case var i when i.Equals("Delete after execution"):
+                        source.Delete = !source.Delete;
+                        break;
+
                     default:
                         ResetInput();
                         break;
@@ -220,7 +238,13 @@ namespace ExeToBat
                 return false;
             }
 
-            ListToMenu(options, DisplayTitle, DisplayOption, ChoiceMethod);
+            List<string> UpdateObjects(List<string> Options)
+            {
+                return options();
+            }
+
+            ListToMenu(options(), DisplayTitle, DisplayOption, ChoiceMethod, ZeroMethod:ZeroMethod, UpdateObjects:UpdateObjects);
+
         }
 
         static void EditExtraction(SourceFile source)
@@ -327,6 +351,8 @@ namespace ExeToBat
             {
                 using (StreamWriter writer = new StreamWriter(outputFile))
                 {
+                    List<string> Executes = new List<string>();
+
                     Console.WriteLine("[Preparing] basic batch structure...");
                     writer.WriteLine("@echo off");
                     writer.WriteLine(":: Auto-generated batch file by ExeToBat ::");
@@ -334,6 +360,7 @@ namespace ExeToBat
 
                     foreach (SourceFile source in sources)
                     {
+                        List<string> Chunks = new List<string>();
 
                         /*
                         byte[] fileBytes = File.ReadAllBytes(fileString);
@@ -344,31 +371,56 @@ namespace ExeToBat
                         Console.WriteLine("[ Reading ] {0}", source.File);
                         List<string> fileChunks = Convert.ToBase64String(File.ReadAllBytes(source.File)).Chunks(chunk).ToList();
                         string tempFile = Path.Combine("%temp%", source.Resource);
-                        writer.WriteLine("(");
+                        Chunks.Add("(");
 
                         int pos = 0;
                         foreach (string part in fileChunks)
                         {
                             pos++;
-                            Console.Write("[ Writing ] {0} part {1}/{2}\r", Path.GetFileName(source.File), pos.ToString().PadLeft(fileChunks.Count.ToString().Length, '0'), fileChunks.Count);
-                            writer.WriteLine(string.Format("echo {0}", part));
+                            Console.Write("[  ] {0} part {1}/{2}\r", Path.GetFileName(source.File), pos.ToString().PadLeft(fileChunks.Count.ToString().Length, '0'), fileChunks.Count);
+                            Chunks.Add(string.Format("echo {0}", part));
                         }
 
                         Console.WriteLine();
-                        writer.WriteLine(string.Format(") >> \"{0}\"", tempFile));
-                        writer.WriteLine("");
-                        writer.WriteLine(string.Format("certutil -decode \"{0}\" \"{1}\" >nul 2>&1", tempFile, Path.Combine(source.Directory, Path.GetFileName(source.File))));
-                        writer.WriteLine("del /f /q \"{0}\" >nul 2>&1", tempFile);
-                        writer.WriteLine("");
+                        Chunks.Add(string.Format(") >> \"{0}\"", tempFile));
+                        Chunks.Add("");
+
+                        Executes.Add(string.Format("certutil -decode \"{0}\" \"{1}\" >nul 2>&1", tempFile, Path.Combine(source.Directory, Path.GetFileName(source.File))));
+                        Executes.Add(string.Format("del /f /q \"{0}\" >nul 2>&1", tempFile));
+                        Executes.Add("");
                         if (source.Execute)
                         {
+                            string wait;
+                            if (source.Wait)
+                            {
+                                if (source.Delete)
+                                {
+                                    Executes.Add(string.Format("del /f /q \"{0}\" >nul 2>&1", Path.Combine(source.Directory, Path.GetFileName(source.File))));
+                                    Executes.Add("");
+                                }
+                                wait = " /wait";
+                            }
+                            else { wait = " "; }
                             Console.WriteLine("[ Writing ] execute mechanism");
-                            writer.WriteLine(string.Format("\"{0}\" {1}", Path.Combine(source.Directory, Path.GetFileName(source.File)), source.Parameters));
-                            writer.WriteLine("");
+                            Executes.Add(string.Format("start{0} \"\" \"cmd / c {1}\" {0}", wait, Path.Combine(source.Directory, Path.GetFileName(source.File)), source.Parameters));
+                            Executes.Add("");
+                            
                         }
+
+                        Console.WriteLine("[ Writing ] {0}", source.File);
+                        writer.Write(Chunks);
+                        Chunks.Clear();
+
                         writer.FlushAsync();
                         Console.WriteLine("[Generated] {0}", Path.GetFileName(source.File));
+
                     }
+
+                    Console.WriteLine("[ Writing ] Executes");
+                    writer.Write(Executes);
+                    writer.FlushAsync();
+
+                    Console.WriteLine("[Generated] All done");
 
                     Console.WriteLine("Press anything...");
                     Console.ReadKey();
@@ -389,9 +441,12 @@ namespace ExeToBat
         {
             public string File { get; set; }
             public bool Execute { get; set; } = false;
+            public bool Wait { get; set; } = false;
+            public bool Delete { get; set; } = false;
             public string Resource { get; set; } = GenTemp();
             public string Directory { get; set; } = "%~dp0";
             public string Parameters { get; set; } = "";
+            
 
             public SourceFile(string file)
             {

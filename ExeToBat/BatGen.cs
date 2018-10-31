@@ -327,7 +327,7 @@ namespace ExeToBat
             {
                 using (StreamWriter writer = new StreamWriter(outputFile))
                 {
-                    Console.WriteLine("[ Writing ] basic batch structure...");
+                    Console.WriteLine("[Preparing] basic batch structure...");
                     writer.WriteLine("@echo off");
                     writer.WriteLine(":: Auto-generated batch file by ExeToBat ::");
                     writer.WriteLine("");

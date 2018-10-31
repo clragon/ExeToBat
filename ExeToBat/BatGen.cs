@@ -166,7 +166,7 @@ namespace ExeToBat
                 return false;
             }
 
-            ListToMenu(options, DisplayTitle, DisplayOption, ChoiceMethod, true, "Exit");
+            ListToMenu(options, DisplayTitle, DisplayOption, ChoiceMethod);
         }
 
         static void ModifySource(SourceFile source)
@@ -178,7 +178,6 @@ namespace ExeToBat
                 if (source.Wait) { opts.Add("Delete after execution");  }
                 return opts;
             }
-            
 
             Dictionary<string, string> ValueMap = new Dictionary<string, string>
             {
@@ -351,8 +350,6 @@ namespace ExeToBat
             {
                 using (StreamWriter writer = new StreamWriter(outputFile))
                 {
-                    List<string> Executes = new List<string>();
-
                     Console.WriteLine("[Preparing] basic batch structure...");
                     writer.WriteLine("@echo off");
                     writer.WriteLine(":: Auto-generated batch file by ExeToBat ::");
@@ -360,65 +357,53 @@ namespace ExeToBat
 
                     foreach (SourceFile source in sources)
                     {
-                        List<string> Chunks = new List<string>();
-
-                        /*
-                        byte[] fileBytes = File.ReadAllBytes(fileString);
-                        string fileBase64 = Convert.ToBase64String(fileBytes);
-                        List<string> fileChunks = fileBase64.Chunks(chunk).ToList();
-                        */
-
                         Console.WriteLine("[ Reading ] {0}", source.File);
                         List<string> fileChunks = Convert.ToBase64String(File.ReadAllBytes(source.File)).Chunks(chunk).ToList();
                         string tempFile = Path.Combine("%temp%", source.Resource);
-                        Chunks.Add("(");
+                        writer.WriteLine("(");
 
                         int pos = 0;
                         foreach (string part in fileChunks)
                         {
                             pos++;
-                            Console.Write("[  ] {0} part {1}/{2}\r", Path.GetFileName(source.File), pos.ToString().PadLeft(fileChunks.Count.ToString().Length, '0'), fileChunks.Count);
-                            Chunks.Add(string.Format("echo {0}", part));
+                            Console.Write("[ Writing ] {0} part {1}/{2}\r", Path.GetFileName(source.File), pos.ToString().PadLeft(fileChunks.Count.ToString().Length, '0'), fileChunks.Count);
+                            writer.WriteLine(string.Format("echo {0}", part));
                         }
 
                         Console.WriteLine();
-                        Chunks.Add(string.Format(") >> \"{0}\"", tempFile));
-                        Chunks.Add("");
+                        writer.WriteLine(string.Format(") >> \"{0}\"", tempFile));
+                        writer.WriteLine("");
 
-                        Executes.Add(string.Format("certutil -decode \"{0}\" \"{1}\" >nul 2>&1", tempFile, Path.Combine(source.Directory, Path.GetFileName(source.File))));
-                        Executes.Add(string.Format("del /f /q \"{0}\" >nul 2>&1", tempFile));
-                        Executes.Add("");
+                        Console.WriteLine("[ Writing ] decode mechanism");
+                        writer.WriteLine(string.Format("certutil -decode \"{0}\" \"{1}\" >nul 2>&1", tempFile, Path.Combine(source.Directory, Path.GetFileName(source.File))));
+                        writer.WriteLine(string.Format("del /f /q \"{0}\" >nul 2>&1", tempFile));
+                        writer.WriteLine("");
+
                         if (source.Execute)
                         {
                             string wait;
+                            if (source.Wait) { wait = " /wait"; } else { wait = " "; }
+                            Console.WriteLine("[ Writing ] execute mechanism");
+                            writer.WriteLine(string.Format("start{0} \"\" \"cmd /c {1}\" {2}", wait, Path.Combine(source.Directory, Path.GetFileName(source.File)), source.Parameters));
                             if (source.Wait)
                             {
+                                Console.WriteLine("[ Writing ] wait mechanism");
                                 if (source.Delete)
                                 {
-                                    Executes.Add(string.Format("del /f /q \"{0}\" >nul 2>&1", Path.Combine(source.Directory, Path.GetFileName(source.File))));
-                                    Executes.Add("");
+                                    Console.WriteLine("[ Writing ] delete mechanism");
+                                    writer.WriteLine(string.Format("del /f /q \"{0}\" >nul 2>&1", Path.Combine(source.Directory, Path.GetFileName(source.File))));
+                                    writer.WriteLine("");
                                 }
-                                wait = " /wait";
                             }
-                            else { wait = " "; }
-                            Console.WriteLine("[ Writing ] execute mechanism");
-                            Executes.Add(string.Format("start{0} \"\" \"cmd / c {1}\" {0}", wait, Path.Combine(source.Directory, Path.GetFileName(source.File)), source.Parameters));
-                            Executes.Add("");
-                            
-                        }
 
-                        Console.WriteLine("[ Writing ] {0}", source.File);
-                        writer.Write(Chunks);
-                        Chunks.Clear();
+                            writer.WriteLine("");
+
+                        }
 
                         writer.FlushAsync();
                         Console.WriteLine("[Generated] {0}", Path.GetFileName(source.File));
 
                     }
-
-                    Console.WriteLine("[ Writing ] Executes");
-                    writer.Write(Executes);
-                    writer.FlushAsync();
 
                     Console.WriteLine("[Generated] All done");
 

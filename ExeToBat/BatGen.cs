@@ -393,7 +393,7 @@ namespace ExeToBat
 
                         }
 
-                        writer.FlushAsync();
+                        writer.Flush();
                         Console.WriteLine("[Generated] {0}", Path.GetFileName(source.File));
 
                     }

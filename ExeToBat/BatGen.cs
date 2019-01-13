@@ -25,12 +25,12 @@ namespace ExeToBat
                 Console.WriteLine("ExeToBat > Main");
             }
 
-            void DisplayOption(List<string> Options, string o, int index, int i)
+            void DisplayEntry(List<string> Options, string o, int index, int i)
             {
                 Console.WriteLine("[{0}] {1}", i, o);
             }
 
-            bool ChoiceMethod(List<string> Options, int index)
+            bool HandleEntry(List<string> Options, int index)
             {
                 switch (Options[index])
                 {
@@ -49,7 +49,7 @@ namespace ExeToBat
                 return false;
             }
 
-            ListToMenu(options, DisplayTitle, DisplayOption, ChoiceMethod, BackString:"Exit");
+            ListToMenu(options, HandleEntry, DisplayTitle, DisplayEntry, ExitEntry:"Exit");
         }
 
         static void ChooseSource()
@@ -60,18 +60,18 @@ namespace ExeToBat
                 Console.WriteLine("[{0}] ({1})", Convert.ToString(0).PadLeft(Convert.ToString(sources.Count).Length, ' '), "Add Files");
             }
 
-            void DisplayOption(List<SourceFile> sources, SourceFile source, int index, int i)
+            void DisplayEntry(List<SourceFile> sources, SourceFile source, int index, int i)
             {
                 Console.WriteLine("[{0}] {1}", Convert.ToString(i).PadLeft(Convert.ToString(sources.Count).Length, ' '), Path.GetFileName(source.File));
             }
 
-            bool ZeroMethod()
+            bool ZeroMethod(List<SourceFile> sources)
             {
                 AddSource();
                 return false;
             }
 
-            bool ChoiceMethod(List<SourceFile> sources, int index)
+            bool HandleEntry(List<SourceFile> sources, int index)
             {
                 ManageSource(sources[index]);
                 return false;
@@ -82,7 +82,7 @@ namespace ExeToBat
                 return Sources;
             }
 
-            ListToMenu(Sources, DisplayTitle, DisplayOption, ChoiceMethod, ZeroMethod, UpdateObjects);
+            ListToMenu(Sources, HandleEntry, DisplayTitle, DisplayEntry, ZeroMethod, UpdateObjects);
         }
 
         static void AddSource()
@@ -138,12 +138,12 @@ namespace ExeToBat
                 Console.WriteLine("ExeToBat > Main > Files > {0}", Path.GetFileName(source.File));
             }
 
-            void DisplayOption(List<string> Options, string o, int index, int i)
+            void DisplayEntry(List<string> Options, string o, int index, int i)
             {
                 Console.WriteLine("[{0}] {1}", i, o);
             }
 
-            bool ChoiceMethod(List<string> Options, int index)
+            bool HandleEntry(List<string> Options, int index)
             {
                 switch (Options[index])
                 {
@@ -166,7 +166,7 @@ namespace ExeToBat
                 return false;
             }
 
-            ListToMenu(options, DisplayTitle, DisplayOption, ChoiceMethod);
+            ListToMenu(options, HandleEntry, DisplayTitle, DisplayEntry);
         }
 
         static void ModifySource(SourceFile source)
@@ -195,14 +195,12 @@ namespace ExeToBat
             }
 
             int MaxLength = options().Select(x => x.Length).Max();
-            void DisplayOption(List<string> Options, string o, int index, int i)
+            void DisplayEntry(List<string> Options, string o, int index, int i)
             {
                 Console.WriteLine("[{0}] {1} | {2}", i, o.PadRight(MaxLength, ' '), source.GetType().GetProperty(ValueMap[o]).GetValue(source).ToString());
             }
 
-            bool ZeroMethod() { ResetInput(); return false; }
-
-            bool ChoiceMethod(List<string> Options, int index)
+            bool HandleEntry(List<string> Options, int index)
             {
                 switch (Options[index])
                 {
@@ -237,12 +235,7 @@ namespace ExeToBat
                 return false;
             }
 
-            List<string> UpdateObjects(List<string> Options)
-            {
-                return options();
-            }
-
-            ListToMenu(options(), DisplayTitle, DisplayOption, ChoiceMethod, ZeroMethod:ZeroMethod, UpdateObjects:UpdateObjects);
+            ListToMenu(options(), HandleEntry, DisplayTitle, DisplayEntry);
 
         }
 
@@ -467,156 +460,169 @@ namespace ExeToBat
         }
 
 
-        public static void ListToMenu<T>(List<T> Objects, Action<List<T>> DisplayTitle, Action<List<T>, T, int, int> DisplayOptions, Func<List<T>, int, bool> ChoiceMethod, bool UserCanAbort = true, string BackString = "Back")
+        /// <summary>
+        /// A function that displays a list as an enumerated menu on the Cli. Items can be chosen and will be processed by passed functions.
+        /// <para>Rest in peace, Cloe.</para>
+        /// </summary>
+        /// <param name="Entries">A list of objects that will be displayed as choices.</param>
+        /// <param name="DisplayTitle">The function that displays the title. It should include displaying the 0th entry if you want to use it.</param>
+        /// <param name="DisplayEntry">The function that displays an entry. The default function can display strings, for any other objects you will have to pass a custom one.</param>
+        /// <param name="HandleEntry">The function that handles the chosen entry.</param>
+        /// <param name="ZeroEntry">The 0th entry. It is different from the passed list and can be used for example to create new entries.</param>
+        /// <param name="RefreshEntries">Pass a function that will handle updating the list of objects here.</param>
+        /// <param name="UserCanAbort">Defines if the user can exit the menu.</param>
+        /// <param name="ExitEntry">The string that is displayed for the entry that closes the menu.</param>
+        public static void ListToMenu<T>(List<T> Entries, Func<List<T>, int, bool> HandleEntry, Action<List<T>> DisplayTitle = null, Action<List<T>, T, int, int> DisplayEntry = null, Func<List<T>, bool> ZeroEntry = null, Func<List<T>, List<T>> RefreshEntries = null, bool UserCanAbort = true, string ExitEntry = null)
         {
-            ListToMenu<T>(Objects, DisplayTitle, DisplayOptions, ChoiceMethod, () => { ResetInput(); return false; }, (List<T> List) => { return List; }, UserCanAbort, BackString);
-        }
 
-        public static void ListToMenu<T>(List<T> Objects, Action<List<T>> DisplayTitle, Action<List<T>, T, int, int> DisplayOptions, Func<List<T>, int, bool> ChoiceMethod, Func<bool> ZeroMethod, Func<List<T>, List<T>> UpdateObjects, bool UserCanAbort = true, string BackString = "Back")
-        {
-            int index = -1;
-            string InputString = "";
-            bool IsMenuExitPending = false;
-            while (!IsMenuExitPending)
+            DisplayTitle = DisplayTitle ?? ((List<T> entries) => { });
+            DisplayEntry = DisplayEntry ?? ((List<T> entries, T entry, int index_, int num) => { Console.WriteLine("[{0}] {1}", Convert.ToString(num).PadLeft(Convert.ToString(entries.Count).Length, ' '), entry); });
+            RefreshEntries = RefreshEntries ?? ((List<T> entries) => { return entries; });
+            ZeroEntry = ZeroEntry ?? ((List<T> entries) => { ResetInput(); return false; });
+            ExitEntry = ExitEntry ?? "Back";
+
+            char ExitKey = 'q';
+            string Prompt = "Choose";
+
+
+            string readInput = string.Empty;
+            bool MenuExitIsPending = false;
+            while (!MenuExitIsPending)
             {
                 Console.Clear();
                 int printedEntries = 0;
-                Objects = UpdateObjects(Objects);
-                DisplayTitle(Objects);
-                if (Objects.Any())
+                Entries = RefreshEntries(Entries);
+                DisplayTitle(Entries);
+                if (Entries.Any())
                 {
-                    int i = 0;
-                    foreach (T x in Objects)
+                    int num = 0;
+                    foreach (T entry in Entries)
                     {
-                        i++;
-                        if (InputString == "")
+                        num++;
+                        if (string.IsNullOrEmpty(readInput) || Convert.ToString(num).StartsWith(readInput))
                         {
-                            DisplayOptions(Objects, x, i - 1, i);
+                            DisplayEntry(Entries, entry, Entries.IndexOf(entry), num);
                             printedEntries++;
                         }
-                        else
-                        {
-                            if (Convert.ToString(i).StartsWith(InputString) || Convert.ToString(i) == InputString)
-                            {
-                                DisplayOptions(Objects, x, i - 1, i);
-                                printedEntries++;
-                            }
-                        }
 
-                        if (Objects.Count > Console.WindowHeight - 5)
+                        if (Entries.Count > Console.WindowHeight - 5)
                         {
-                            if (printedEntries == Console.WindowHeight - 6)
+                            if (printedEntries >= Console.WindowHeight - (5 + 1))
                             {
-                                Console.WriteLine("[{0}]", ".".PadLeft(Convert.ToString(Objects.Count).Length, '.'));
+                                Console.WriteLine("[{0}] +{1}", ".".PadLeft(Convert.ToString(Entries.Count).Length, '.'), Entries.Count);
                                 break;
                             }
                         }
-                        else { if (printedEntries == Console.WindowHeight - 5) { break; } }
+                        else
+                        {
+                            if (printedEntries == Console.WindowHeight - 5)
+                            {
+                                break;
+                            }
+                        }
+
                     }
                 }
 
                 if (UserCanAbort)
                 {
-                    Console.WriteLine("[{0}] {1}", "q".PadLeft(Convert.ToString(Objects.Count).Length, ' '), BackString);
+                    Console.WriteLine("[{0}] {1}", Convert.ToString(ExitKey).PadLeft(Convert.ToString(Entries.Count).Length, ' '), ExitEntry);
                 }
-                Console.Write("\n");
 
-                bool IsInputValid = false;
-                while (!IsInputValid)
+                Console.WriteLine();
+
+                bool InputIsValid = false;
+                while (!InputIsValid)
                 {
-                    Console.Write("{0}> {1}", "", InputString);
-                    string input = Console.ReadKey().KeyChar.ToString();
+                    Console.Write("{0}> {1}", Prompt, readInput);
+                    ConsoleKeyInfo input = Console.ReadKey();
                     new System.Threading.ManualResetEvent(false).WaitOne(20);
+                    int choiceNum = -1;
                     switch (input)
                     {
-                        case "q":
+                        case var key when key.KeyChar.Equals(ExitKey):
                             if (UserCanAbort)
                             {
-                                Console.Write("\n");
-                                IsInputValid = true;
-                                IsMenuExitPending = true;
+                                Console.WriteLine();
+                                InputIsValid = true;
+                                MenuExitIsPending = true;
                             }
                             else
                             {
-                                Console.Write("\n");
+                                Console.WriteLine();
                                 ResetInput();
                             }
                             break;
 
-                        case "\b":
-                            if (!(InputString == ""))
+                        case var key when key.Key.Equals(ConsoleKey.Backspace):
+                            if (!string.IsNullOrEmpty(readInput))
                             {
                                 Console.Write("\b");
-                                InputString = InputString.Remove(InputString.Length - 1);
+                                readInput = readInput.Remove(readInput.Length - 1);
                             }
-                            IsInputValid = true;
+                            InputIsValid = true;
                             break;
 
-                        case "\n":
-                        case "\r":
-                            if (InputString != "")
+                        case var key when key.Key.Equals(ConsoleKey.Enter):
+                            if (!string.IsNullOrEmpty(readInput))
                             {
-                                index = Convert.ToInt32(InputString) - 1;
-                                InputString = "";
-                                IsInputValid = true;
-                                if (ChoiceMethod(Objects, index))
+                                if (HandleEntry(Entries, (Convert.ToInt32(readInput) - 1)))
                                 {
-                                    IsMenuExitPending = true;
+                                    MenuExitIsPending = true;
+                                }
+                                readInput = string.Empty;
+                            }
+                            InputIsValid = true;
+                            break;
+
+                        case var key when int.TryParse(key.KeyChar.ToString(), out choiceNum):
+                            Console.WriteLine();
+                            if (string.IsNullOrEmpty(readInput) && choiceNum.Equals(0))
+                            {
+                                InputIsValid = true;
+                                if (ZeroEntry(Entries))
+                                {
+                                    MenuExitIsPending = true;
+                                }
+                            }
+                            else
+                            {
+                                if (Convert.ToInt32(readInput + Convert.ToString(choiceNum)) <= Entries.Count)
+                                {
+                                    InputIsValid = true;
+                                    int matchingEntries = 0;
+                                    readInput = readInput + Convert.ToString(choiceNum);
+                                    for (int i = 0; i < Entries.Count; i++)
+                                    {
+                                        if (Convert.ToString(i + 1).StartsWith(readInput) || Convert.ToString(i + 1) == readInput) { matchingEntries++; }
+                                    }
+                                    if ((readInput.Length == Convert.ToString(Entries.Count).Length) || (matchingEntries == 1))
+                                    {
+                                        if (HandleEntry(Entries, (Convert.ToInt32(readInput) - 1)))
+                                        {
+                                            MenuExitIsPending = true;
+                                        }
+                                        readInput = string.Empty;
+                                    }
+                                }
+                                else
+                                {
+                                    ResetInput();
                                 }
                             }
                             break;
 
                         default:
-                            Console.Write("\n");
-                            int choice;
-                            if ((int.TryParse(input, out choice)))
-                            {
-                                if ((InputString == "") && (choice == 0))
-                                {
-                                    IsInputValid = true;
-                                    if (ZeroMethod())
-                                    {
-                                        IsMenuExitPending = true;
-                                    }
-                                }
-                                else
-                                {
-                                    if (Convert.ToInt32(InputString + Convert.ToString(choice)) <= Objects.Count)
-                                    {
-                                        int MatchingItems = 0;
-                                        InputString = InputString + Convert.ToString(choice);
-                                        for (int i = 0; i < Objects.Count; i++) { if (Convert.ToString(i + 1).StartsWith(InputString) || Convert.ToString(i + 1) == InputString) { MatchingItems++; } }
-                                        if ((InputString.Length == Convert.ToString(Objects.Count).Length) || (MatchingItems == 1))
-                                        {
-                                            index = Convert.ToInt32(InputString) - 1;
-                                            InputString = "";
-                                            IsInputValid = true;
-                                            if (ChoiceMethod(Objects, index))
-                                            {
-                                                IsMenuExitPending = true;
-                                            }
-                                        }
-                                        else
-                                        {
-                                            IsInputValid = true;
-                                        }
-                                    }
-                                    else
-                                    {
-                                        ResetInput();
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                ResetInput();
-                            }
+                            Console.WriteLine();
+                            ResetInput();
                             break;
                     }
                 }
+
             }
-            Console.Clear();
         }
+
+
 
         public static void YesNoMenu(string title, Action Yes, Action No)
         {

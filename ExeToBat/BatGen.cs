@@ -408,7 +408,7 @@ namespace ExeToBat
             else
             {
                 Console.WriteLine("No files specified");
-                new System.Threading.ManualResetEvent(false).WaitOne(500);
+                Wait(500);
 
             }
             
@@ -457,6 +457,16 @@ namespace ExeToBat
             }
 
             return stringArray;
+        }
+
+
+
+        public static void Wait(int ms)
+        {
+            using (System.Threading.ManualResetEvent wait = new System.Threading.ManualResetEvent(false))
+            {
+                wait.WaitOne(ms);
+            }
         }
 
 
@@ -536,7 +546,7 @@ namespace ExeToBat
                 {
                     Console.Write("{0}> {1}", Prompt, readInput);
                     ConsoleKeyInfo input = Console.ReadKey();
-                    new System.Threading.ManualResetEvent(false).WaitOne(20);
+                    Wait(20);
                     int choiceNum = -1;
                     switch (input)
                     {
@@ -631,7 +641,7 @@ namespace ExeToBat
             {
                 Console.Write("{0}? [{1}]> ", title, "Y/N");
                 string Input = Console.ReadKey().KeyChar.ToString();
-                new System.Threading.ManualResetEvent(false).WaitOne(20);
+                Wait(20);
                 Console.Write("\n");
                 if (string.Equals(Input, "Y", StringComparison.OrdinalIgnoreCase))
                 {
@@ -654,7 +664,7 @@ namespace ExeToBat
         public static void ResetInput(string error = "Input Invalid")
         {
             Console.Write(string.Format("[{0}] {1}", "Error", error));
-            new System.Threading.ManualResetEvent(false).WaitOne(150);
+            Wait(150);
             ClearCurrentConsoleLine();
             Console.SetCursorPosition(0, Console.CursorTop - 1);
             ClearCurrentConsoleLine();

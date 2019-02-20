@@ -104,7 +104,7 @@ namespace ExeToBat
                 {
                     switch (input)
                     {
-                        case var i when Directory.Exists(input):
+                        case var i when Directory.Exists(i):
                             IsInputValid = true;
                             foreach (string file in Directory.GetFiles(input))
                             {
@@ -112,7 +112,7 @@ namespace ExeToBat
                             }
                             break;
 
-                        case var i when File.Exists(input):
+                        case var i when File.Exists(i):
                             IsInputValid = true;
                             Sources.Add(new SourceFile(input));
                             break;
@@ -601,7 +601,7 @@ namespace ExeToBat
                                 {
                                     InputIsValid = true;
                                     int matchingEntries = 0;
-                                    readInput = readInput + Convert.ToString(choiceNum);
+                                    readInput = new System.Text.StringBuilder().Append(readInput).Append(Convert.ToString(choiceNum)).ToString();
                                     for (int i = 0; i < Entries.Count; i++)
                                     {
                                         if (Convert.ToString(i + 1).StartsWith(readInput) || Convert.ToString(i + 1) == readInput) { matchingEntries++; }

@@ -11,83 +11,71 @@ namespace ExeToBat
 
         public static List<SourceFile> Sources = new List<SourceFile>();
 
-        static void Main(string[] args)
-        {
-            MainMenu();
-        }
+        static void Main() => MainMenu();
 
         static void MainMenu()
         {
-            List<string> options = new List<string> { "Files", "Generate" };
+            Dictionary<string, Action> options = new Dictionary<string, Action> {
+                { "Files", ChooseSource },
+                { "Generate", () => BuildBat(Sources, "output.bat") }
+            };
 
-            void DisplayTitle(List<string> Options)
+            new ListMenu<string>(options.Keys.ToList())
             {
-                Console.WriteLine("ExeToBat > Main");
-            }
-
-            void DisplayEntry(List<string> Options, string o, int index, int i)
-            {
-                Console.WriteLine("[{0}] {1}", i, o);
-            }
-
-            bool HandleEntry(List<string> Options, int index)
-            {
-                switch (Options[index])
+                DisplayTitle = (List<string> Options) => Console.WriteLine("ExeToBat > Main"),
+                DisplayEntry = (List<string> Options, int index, int i) =>
                 {
-                    case var i when i.Equals("Files"):
-                        ChooseSource();
-                        break;
-
-                    case var i when i.Equals("Generate"):
-                        BuildBat(Sources, "output.bat");
-                        break;
-
-                    default:
+                    Console.WriteLine("[{0}] {1}", i, Options[index]);
+                },
+                HandleEntry = (List<string> Options, int index) =>
+                {
+                    if (options.ContainsKey(Options[index]))
+                    {
+                        options[Options[index]]();
+                    }
+                    else
+                    {
                         ResetInput();
-                        break;
-                }
-                return false;
-            }
+                    }
 
-            ListToMenu(options, HandleEntry, DisplayTitle, DisplayEntry, ExitEntry:"Exit");
+                    return false;
+                },
+                ExitEntry = "Exit",
+
+            }.Show();
         }
 
         static void ChooseSource()
         {
-            void DisplayTitle(List<SourceFile> sources)
+            new ListMenu<SourceFile>(Sources)
             {
-                Console.WriteLine("ExeToBat > Main > Files");
-                Console.WriteLine("[{0}] ({1})", Convert.ToString(0).PadLeft(Convert.ToString(sources.Count).Length, ' '), "Add Files");
-            }
+                DisplayTitle = (List<SourceFile> sources) =>
+                {
+                    Console.WriteLine("ExeToBat > Main > Files");
+                    Console.WriteLine("[{0}] ({1})", Convert.ToString(0).PadLeft(Convert.ToString(sources.Count).Length, ' '), "Add Files");
+                },
+                DisplayEntry = (List<SourceFile> sources, int index, int i) =>
+                    Console.WriteLine("[{0}] {1}",
+                        Convert.ToString(i).PadLeft(
+                        Convert.ToString(sources.Count).Length, ' '),
+                        Path.GetFileName(sources[index].File)),
+                ZeroEntry = (List<SourceFile> sources) =>
+                {
+                    AddSource();
+                    return false;
+                },
+                HandleEntry = (List<SourceFile> sources, int index) =>
+                {
+                    ManageSource(sources[index]);
+                    return false;
+                },
+                RefreshEntries = (List<SourceFile> sources) => Sources,
 
-            void DisplayEntry(List<SourceFile> sources, SourceFile source, int index, int i)
-            {
-                Console.WriteLine("[{0}] {1}", Convert.ToString(i).PadLeft(Convert.ToString(sources.Count).Length, ' '), Path.GetFileName(source.File));
-            }
-
-            bool ZeroMethod(List<SourceFile> sources)
-            {
-                AddSource();
-                return false;
-            }
-
-            bool HandleEntry(List<SourceFile> sources, int index)
-            {
-                ManageSource(sources[index]);
-                return false;
-            }
-
-            List<SourceFile> UpdateObjects(List<SourceFile> sources)
-            {
-                return Sources;
-            }
-
-            ListToMenu(Sources, HandleEntry, DisplayTitle, DisplayEntry, ZeroMethod, UpdateObjects);
+            }.Show();
         }
 
         static void AddSource()
         {
-            string input = "";
             bool IsInputValid = false;
             while (!IsInputValid)
             {
@@ -96,7 +84,7 @@ namespace ExeToBat
                 Console.WriteLine("ExeToBat > Main > Files > Add");
                 Console.Write("\n");
                 Console.Write("{0}> ", "File/Folder");
-                input = Console.ReadLine();
+                string input = Console.ReadLine();
 
                 input.Trim();
                 input = input.Replace("\"", "");
@@ -131,117 +119,106 @@ namespace ExeToBat
 
         static void ManageSource(SourceFile source)
         {
-            List<string> options = new List<string> { "Edit", "Position", "Delete" };
-
-            void DisplayTitle(List<string> Options)
+            Dictionary<string, Func<bool>> options = new Dictionary<string, Func<bool>>
             {
-                Console.WriteLine("ExeToBat > Main > Files > {0}", Path.GetFileName(source.File));
-            }
-
-            void DisplayEntry(List<string> Options, string o, int index, int i)
-            {
-                Console.WriteLine("[{0}] {1}", i, o);
-            }
-
-            bool HandleEntry(List<string> Options, int index)
-            {
-                switch (Options[index])
-                {
-                    case var i when i.Equals("Edit"):
-                        ModifySource(source);
-                        break;
-
-                    case var i when i.Equals("Position"):
-                        EditPosition(source);
-                        break;
-
-                    case var i when i.Equals("Delete"):
-                        Sources.Remove(source);
-                        return true;
-
-                    default:
-                        ResetInput();
-                        break;
+                {"Edit", () => {
+                    ModifySource(source);
+                    return false;
                 }
-                return false;
-            }
+                    },
+                { "Position", () => {
+                    EditPosition(source);
+                    return false;
+                }
+                },
+                { "Delete", () => {
+                    Sources.Remove(source);
+                    return true;
+                }
+                },
+            };
 
-            ListToMenu(options, HandleEntry, DisplayTitle, DisplayEntry);
+            new ListMenu<string>(options.Keys.ToList())
+            {
+                DisplayTitle = (List<string> Options) => Console.WriteLine("ExeToBat > Main > Files > {0}", Path.GetFileName(source.File)),
+                DisplayEntry = (List<string> Options, int index, int i) => Console.WriteLine("[{0}] {1}", i, Options[index]),
+                HandleEntry = (List<string> Options, int index) =>
+                {
+                    if (options.ContainsKey(Options[index]))
+                    {
+                        return options[Options[index]]();
+                    }
+                    else
+                    {
+                        ResetInput();
+                    }
+
+                    return false;
+                },
+
+            }.Show();
         }
 
         static void ModifySource(SourceFile source)
         {
 
-            List<string> options() {
-                List<string> opts = new List<string> { "File", "Extraction directory", "Execute after extraction" };
-                if (source.Execute) { opts.AddRange( new List<string> { "Parameters", "Wait for exit" } ); }
-                if (source.Wait) { opts.Add("Delete after execution");  }
+            // this could be solved better with an enum
+
+            Dictionary<string, Action> options()
+            {
+                Dictionary<string, Action> opts = new Dictionary<string, Action> {
+                    {"File", () => { } },
+                    {"Extraction directory", () => EditExtraction(source)},
+                    {"Execute after extraction", () => source.Execute = !source.Execute },
+                };
+                if (source.Execute)
+                {
+                    opts.Add("Parameters", () => EditParameters(source));
+                    opts.Add("Wait for exit", () => source.Wait = !source.Wait);
+                }
+                if (source.Execute && source.Wait) { opts.Add("Delete after execution", () => source.Delete = !source.Delete); }
                 return opts;
             }
 
             Dictionary<string, string> ValueMap = new Dictionary<string, string>
             {
                 { "File", "File" },
+                { "Extraction directory", "Directory" },
                 { "Execute after extraction", "Execute" },
+                { "Parameters", "Parameters" },
                 { "Wait for exit", "Wait"},
                 { "Delete after execution", "Delete"},
-                { "Extraction directory", "Directory" },
-                { "Parameters", "Parameters" },
             };
 
-            void DisplayTitle(List<string> Options)
+            new ListMenu<string>(options().Keys.ToList())
             {
-                Console.WriteLine("ExeToBat > Main > Files > {0} > Edit", Path.GetFileName(source.File));
-            }
-
-            int MaxLength = options().Select(x => x.Length).Max();
-            void DisplayEntry(List<string> Options, string o, int index, int i)
-            {
-                Console.WriteLine("[{0}] {1} | {2}", i, o.PadRight(MaxLength, ' '), source.GetType().GetProperty(ValueMap[o]).GetValue(source).ToString());
-            }
-
-            bool HandleEntry(List<string> Options, int index)
-            {
-                switch (Options[index])
+                DisplayTitle = (List<string> Options) => Console.WriteLine("ExeToBat > Main > Files > {0} > Edit", Path.GetFileName(source.File)),
+                DisplayEntry = (List<string> Options, int index, int i) =>
                 {
-                    case var i when i.Equals("File"):
-                        
-                        break;
-
-                    case var i when i.Equals("Execute after extraction"):
-                        source.Execute = !source.Execute;
-                        break;
-
-                    case var i when i.Equals("Extraction directory"):
-                        EditExtraction(source);
-                        break;
-
-                    case var i when i.Equals("Parameters"):
-                        EditParameters(source);
-                        break;
-
-                    case var i when i.Equals("Wait for exit"):
-                        source.Wait = !source.Wait;
-                        break;
-
-                    case var i when i.Equals("Delete after execution"):
-                        source.Delete = !source.Delete;
-                        break;
-
-                    default:
+                    int MaxLength = options().Keys.Select(x => x.Length).Max();
+                    Console.WriteLine("[{0}] {1} | {2}", i, Options[index].PadRight(MaxLength, ' '), source.GetType().GetProperty(ValueMap[Options[index]]).GetValue(source).ToString());
+                },
+                HandleEntry = (List<string> Options, int index) =>
+                {
+                    if (options().ContainsKey(Options[index]))
+                    {
+                        options()[Options[index]]();
+                    }
+                    else
+                    {
                         ResetInput();
-                        break;
-                }
-                return false;
-            }
+                    }
 
-            ListToMenu(options(), HandleEntry, DisplayTitle, DisplayEntry);
+                    return false;
+                },
+                RefreshEntries = (List<string> Options) => options().Keys.ToList(),
+
+            }.Show();
 
         }
 
         static void EditExtraction(SourceFile source)
         {
-            string input = "";
             bool IsInputValid = false;
             while (!IsInputValid)
             {
@@ -253,7 +230,7 @@ namespace ExeToBat
                 Console.WriteLine("https://ss64.com/nt/syntax-args.html");
                 Console.Write("\n");
                 Console.Write("{0}> ", "Directory");
-                input = Console.ReadLine();
+                string input = Console.ReadLine();
 
                 input.Trim();
                 if (!string.IsNullOrEmpty(input))
@@ -270,7 +247,6 @@ namespace ExeToBat
 
         static void EditParameters(SourceFile source)
         {
-            string input = "";
             bool IsInputValid = false;
             while (!IsInputValid)
             {
@@ -278,7 +254,7 @@ namespace ExeToBat
                 Console.WriteLine("ExeToBat > Main > Files > {0} > Edit > Parameters", Path.GetFileName(source.File));
                 Console.Write("\n");
                 Console.Write("{0}> ", "Parameters");
-                input = Console.ReadLine();
+                string input = Console.ReadLine();
 
                 input.Trim();
                 if (!string.IsNullOrEmpty(input))
@@ -295,8 +271,6 @@ namespace ExeToBat
 
         static void EditPosition(SourceFile source)
         {
-            string input = "";
-            int index = -1;
             bool IsInputValid = false;
             while (!IsInputValid)
             {
@@ -305,9 +279,9 @@ namespace ExeToBat
 
                 Console.Write("\n");
                 Console.Write("{0}> ", "New index");
-                input = Console.ReadLine();
+                string input = Console.ReadLine();
 
-                if (int.TryParse(input, out index))
+                if (int.TryParse(input, out int index))
                 {
                     if (index < Sources.Count)
                     {
@@ -339,7 +313,7 @@ namespace ExeToBat
             Console.Clear();
             Console.WriteLine("ExeToBat > Main > Generate");
 
-            if(Sources.Any())
+            if (Sources.Any())
             {
                 using (StreamWriter writer = new StreamWriter(outputFile))
                 {
@@ -411,7 +385,7 @@ namespace ExeToBat
                 Wait(500);
 
             }
-            
+
 
         }
 
@@ -424,7 +398,7 @@ namespace ExeToBat
             public string Resource { get; set; } = GenTemp();
             public string Directory { get; set; } = "%~dp0";
             public string Parameters { get; set; } = "";
-            
+
 
             public SourceFile(string file)
             {
@@ -433,7 +407,7 @@ namespace ExeToBat
 
             static public string GenTemp()
             {
-                return string.Format("{0}{1}{2}", "res_", new Random().Next(1000, 10000), ".b64");
+                return string.Format($"res_{new Random().Next(1000, 10000)}.b64");
             }
 
         }
@@ -453,7 +427,7 @@ namespace ExeToBat
                 int startIndex = chunkSize * i;
                 stringArray[i] = toSplit.Substring(startIndex, lengthToUse);
 
-                lengthRemaining = lengthRemaining - lengthToUse;
+                lengthRemaining -= lengthToUse;
             }
 
             return stringArray;
@@ -469,171 +443,234 @@ namespace ExeToBat
             }
         }
 
-
-        /// <summary>
-        /// A function that displays a list as an enumerated menu on the Cli. Items can be chosen and will be processed by passed functions.
-        /// <para>Rest in peace, Cloe.</para>
-        /// </summary>
-        /// <param name="Entries">A list of objects that will be displayed as choices.</param>
-        /// <param name="DisplayTitle">The function that displays the title. It should include displaying the 0th entry if you want to use it.</param>
-        /// <param name="DisplayEntry">The function that displays an entry. The default function can display strings, for any other objects you will have to pass a custom one.</param>
-        /// <param name="HandleEntry">The function that handles the chosen entry.</param>
-        /// <param name="ZeroEntry">The 0th entry. It is different from the passed list and can be used for example to create new entries.</param>
-        /// <param name="RefreshEntries">Pass a function that will handle updating the list of objects here.</param>
-        /// <param name="UserCanAbort">Defines if the user can exit the menu.</param>
-        /// <param name="ExitEntry">The string that is displayed for the entry that closes the menu.</param>
-        public static void ListToMenu<T>(List<T> Entries, Func<List<T>, int, bool> HandleEntry, Action<List<T>> DisplayTitle = null, Action<List<T>, T, int, int> DisplayEntry = null, Func<List<T>, bool> ZeroEntry = null, Func<List<T>, List<T>> RefreshEntries = null, bool UserCanAbort = true, string ExitEntry = null)
+        public class ListMenu<T>
         {
 
-            DisplayTitle = DisplayTitle ?? ((List<T> entries) => { });
-            DisplayEntry = DisplayEntry ?? ((List<T> entries, T entry, int index_, int num) => { Console.WriteLine("[{0}] {1}", Convert.ToString(num).PadLeft(Convert.ToString(entries.Count).Length, ' '), entry); });
-            RefreshEntries = RefreshEntries ?? ((List<T> entries) => { return entries; });
-            ZeroEntry = ZeroEntry ?? ((List<T> entries) => { ResetInput(); return false; });
-            ExitEntry = ExitEntry ?? "Back";
+            /// <summary>
+            /// CLOE (Command-line List Options Enumerator).
+            /// <para>Turns a List<T> into a menu of options. Each list item is asigned a number. Provides several callbacks to customise the menu.</para>
+            /// </summary>
+            /// <param name="entries">List of objects you want to display</param>
+            public ListMenu(List<T> entries)
+            {
+                Entries = entries;
+            }
 
-            char ExitKey = 'q';
-            string Prompt = "Choose";
+            /// <summary>
+            /// The prompt that is displayed to the user.
+            /// </summary>
+            public string Prompt = "Choose";
+
+            /// <summary>
+            /// The string to be displayed for the option to exit the menu.
+            /// </summary>
+            public string ExitEntry = "Back";
+
+            /// <summary>
+            /// The key the user has to press to exit the menu.
+            /// </summary>
+            public char ExitKey = 'q';
+
+            /// <summary>
+            /// Wether or not the user can exit the menu.
+            /// </summary>
+            public bool UserCanExit = true;
 
 
-            string readInput = string.Empty;
-            bool MenuExitIsPending = false;
-            while (!MenuExitIsPending)
+            private List<T> Entries;
+
+            /// <summary>
+            /// The function that processes the chosen menu entries.
+            /// </summary>
+            public Func<List<T>, int, bool> HandleEntry = (entries, index) =>
             {
                 Console.Clear();
-                int printedEntries = 0;
-                Entries = RefreshEntries(Entries);
-                DisplayTitle(Entries);
-                if (Entries.Any())
+                Console.WriteLine(entries[index]);
+                Wait(200);
+                return false;
+            };
+
+            /// <summary>
+            /// The function that displays the menu title.
+            /// </summary>
+            public Action<List<T>> DisplayTitle = (entries) => { };
+
+            /// <summary>
+            /// The function that displays the entry to the user.
+            /// </summary>
+            public Action<List<T>, int, int> DisplayEntry = (entries, index, num) =>
+            {
+                Console.WriteLine("[{0}] {1}", Convert.ToString(num).PadLeft(Convert.ToString(entries.Count).Length, ' '), entries[index]);
+            };
+
+            /// <summary>
+            /// The function to update the list of entries.
+            /// </summary>
+            public Func<List<T>, List<T>> RefreshEntries = (entries) =>
+            {
+                return entries;
+            };
+
+            /// <summary>
+            /// The function that is called when 0th entry in the list is chosen.
+            /// <para>Display this entry with the title function.</para>
+            /// </summary>
+            public Func<List<T>, bool> ZeroEntry = (entries) =>
+            {
+                ResetInput();
+                return false;
+            };
+
+            /// <summary>
+            /// Display the menu.
+            /// </summary>
+            /// <returns></returns>
+            public ListMenu<T> Show()
+            {
+                string readInput = string.Empty;
+                bool MenuExitIsPending = false;
+                while (!MenuExitIsPending)
                 {
-                    int num = 0;
-                    foreach (T entry in Entries)
+                    Console.Clear();
+                    int printedEntries = 0;
+                    Entries = RefreshEntries(Entries);
+                    DisplayTitle(Entries);
+                    if (Entries.Any())
                     {
-                        num++;
-                        if (string.IsNullOrEmpty(readInput) || Convert.ToString(num).StartsWith(readInput))
+                        int num = 0;
+                        foreach (T entry in Entries)
                         {
-                            DisplayEntry(Entries, entry, Entries.IndexOf(entry), num);
-                            printedEntries++;
-                        }
-
-                        if (Entries.Count > Console.WindowHeight - 5)
-                        {
-                            if (printedEntries >= Console.WindowHeight - (5 + 1))
+                            num++;
+                            if (string.IsNullOrEmpty(readInput) || Convert.ToString(num).StartsWith(readInput))
                             {
-                                Console.WriteLine("[{0}] +{1}", ".".PadLeft(Convert.ToString(Entries.Count).Length, '.'), Entries.Count);
-                                break;
+                                DisplayEntry(Entries, Entries.IndexOf(entry), num);
+                                printedEntries++;
                             }
-                        }
-                        else
-                        {
-                            if (printedEntries == Console.WindowHeight - 5)
-                            {
-                                break;
-                            }
-                        }
 
+                            if (Entries.Count > Console.WindowHeight - 5)
+                            {
+                                if (printedEntries >= Console.WindowHeight - (5 + 1))
+                                {
+                                    Console.WriteLine("[{0}] +{1}", ".".PadLeft(Convert.ToString(Entries.Count).Length, '.'), Entries.Count);
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                if (printedEntries == Console.WindowHeight - 5)
+                                {
+                                    break;
+                                }
+                            }
+
+                        }
                     }
-                }
 
-                if (UserCanAbort)
-                {
-                    Console.WriteLine("[{0}] {1}", Convert.ToString(ExitKey).PadLeft(Convert.ToString(Entries.Count).Length, ' '), ExitEntry);
-                }
-
-                Console.WriteLine();
-
-                bool InputIsValid = false;
-                while (!InputIsValid)
-                {
-                    Console.Write("{0}> {1}", Prompt, readInput);
-                    ConsoleKeyInfo input = Console.ReadKey();
-                    Wait(20);
-                    int choiceNum = -1;
-                    switch (input)
+                    if (UserCanExit)
                     {
-                        case var key when key.KeyChar.Equals(ExitKey):
-                            if (UserCanAbort)
-                            {
-                                Console.WriteLine();
-                                InputIsValid = true;
-                                MenuExitIsPending = true;
-                            }
-                            else
-                            {
-                                Console.WriteLine();
-                                ResetInput();
-                            }
-                            break;
+                        Console.WriteLine("[{0}] {1}", Convert.ToString(ExitKey).PadLeft(Convert.ToString(Entries.Count).Length, ' '), ExitEntry);
+                    }
 
-                        case var key when key.Key.Equals(ConsoleKey.Backspace):
-                            if (!string.IsNullOrEmpty(readInput))
-                            {
-                                Console.Write("\b");
-                                readInput = readInput.Remove(readInput.Length - 1);
-                            }
-                            InputIsValid = true;
-                            break;
+                    Console.WriteLine();
 
-                        case var key when key.Key.Equals(ConsoleKey.Enter):
-                            if (!string.IsNullOrEmpty(readInput))
-                            {
-                                if (HandleEntry(Entries, (Convert.ToInt32(readInput) - 1)))
+                    bool InputIsValid = false;
+                    while (!InputIsValid)
+                    {
+                        Console.Write("{0}> {1}", Prompt, readInput);
+                        ConsoleKeyInfo input = Console.ReadKey();
+                        Wait(20);
+                        int choiceNum = -1;
+                        switch (input)
+                        {
+                            case var key when key.KeyChar.Equals(ExitKey):
+                                if (UserCanExit)
                                 {
+                                    Console.WriteLine();
+                                    InputIsValid = true;
                                     MenuExitIsPending = true;
                                 }
-                                readInput = string.Empty;
-                            }
-                            InputIsValid = true;
-                            break;
-
-                        case var key when int.TryParse(key.KeyChar.ToString(), out choiceNum):
-                            Console.WriteLine();
-                            if (string.IsNullOrEmpty(readInput) && choiceNum.Equals(0))
-                            {
-                                InputIsValid = true;
-                                if (ZeroEntry(Entries))
+                                else
                                 {
-                                    MenuExitIsPending = true;
+                                    Console.WriteLine();
+                                    ResetInput();
                                 }
-                            }
-                            else
-                            {
-                                if (Convert.ToInt32(readInput + Convert.ToString(choiceNum)) <= Entries.Count)
+                                break;
+
+                            case var key when key.Key.Equals(ConsoleKey.Backspace):
+                                if (!string.IsNullOrEmpty(readInput))
+                                {
+                                    Console.Write("\b");
+                                    readInput = readInput.Remove(readInput.Length - 1);
+                                }
+                                InputIsValid = true;
+                                break;
+
+                            case var key when key.Key.Equals(ConsoleKey.Enter):
+                                if (!string.IsNullOrEmpty(readInput))
+                                {
+                                    if (HandleEntry(Entries, (Convert.ToInt32(readInput) - 1)))
+                                    {
+                                        MenuExitIsPending = true;
+                                    }
+                                    readInput = string.Empty;
+                                }
+                                InputIsValid = true;
+                                break;
+
+                            case var key when int.TryParse(key.KeyChar.ToString(), out choiceNum):
+                                Console.WriteLine();
+                                if (string.IsNullOrEmpty(readInput) && choiceNum.Equals(0))
                                 {
                                     InputIsValid = true;
-                                    int matchingEntries = 0;
-                                    readInput = new System.Text.StringBuilder().Append(readInput).Append(Convert.ToString(choiceNum)).ToString();
-                                    for (int i = 0; i < Entries.Count; i++)
+                                    if (ZeroEntry(Entries))
                                     {
-                                        if (Convert.ToString(i + 1).StartsWith(readInput) || Convert.ToString(i + 1) == readInput) { matchingEntries++; }
-                                    }
-                                    if ((readInput.Length == Convert.ToString(Entries.Count).Length) || (matchingEntries == 1))
-                                    {
-                                        if (HandleEntry(Entries, (Convert.ToInt32(readInput) - 1)))
-                                        {
-                                            MenuExitIsPending = true;
-                                        }
-                                        readInput = string.Empty;
+                                        MenuExitIsPending = true;
                                     }
                                 }
                                 else
                                 {
-                                    ResetInput();
+                                    if (Convert.ToInt32(readInput + Convert.ToString(choiceNum)) <= Entries.Count)
+                                    {
+                                        InputIsValid = true;
+                                        int matchingEntries = 0;
+                                        readInput = new System.Text.StringBuilder().Append(readInput).Append(Convert.ToString(choiceNum)).ToString();
+                                        for (int i = 0; i < Entries.Count; i++)
+                                        {
+                                            if (Convert.ToString(i + 1).StartsWith(readInput) || Convert.ToString(i + 1) == readInput) { matchingEntries++; }
+                                        }
+                                        if ((readInput.Length == Convert.ToString(Entries.Count).Length) || (matchingEntries == 1))
+                                        {
+                                            if (HandleEntry(Entries, (Convert.ToInt32(readInput) - 1)))
+                                            {
+                                                MenuExitIsPending = true;
+                                            }
+                                            readInput = string.Empty;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        ResetInput();
+                                    }
                                 }
-                            }
-                            break;
+                                break;
 
-                        default:
-                            Console.WriteLine();
-                            ResetInput();
-                            break;
+                            default:
+                                Console.WriteLine();
+                                ResetInput();
+                                break;
+                        }
                     }
                 }
-
+                return this;
             }
         }
 
-
-
+        /// <summary>
+        /// A simple template to create Yes or No menus.
+        /// </summary>
+        /// <param name="title">The title of the menu.</param>
+        /// <param name="Yes">The function to be called upon Yes</param>
+        /// <param name="No">The function to be called upon No</param>
         public static void YesNoMenu(string title, Action Yes, Action No)
         {
             bool IsInputValid = false;
@@ -679,5 +716,5 @@ namespace ExeToBat
         }
 
     }
-    
+
 }

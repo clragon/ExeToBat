@@ -2,6 +2,7 @@
 using static System.ConsoleUtils;
 using Mono.Options;
 using System.Text.Json;
+using System.Reflection;
 
 namespace ExeToBat
 {
@@ -34,7 +35,7 @@ namespace ExeToBat
                 List<string> extra = options.Parse(args);
                 if (help)
                 {
-                    options.WriteOptionDescriptions(System.Console.Out);
+                    Help(options);
                 }
                 else if (config != null)
                 {
@@ -45,7 +46,7 @@ namespace ExeToBat
                     }
                     catch (Exception e) when (e is IOException || e is JsonException)
                     {
-                        System.Console.Write("Failed to load config {0}: {1}", config, e);
+                        System.Console.WriteLine("Failed to load config {0}:\n{1}", config, e.Message);
                     }
                 }
                 else
@@ -55,12 +56,25 @@ namespace ExeToBat
             }
             catch (OptionException e)
             {
-                System.Console.Write("Invalid arguments: {0}", e);
-                options.WriteOptionDescriptions(System.Console.Out);
+                System.Console.WriteLine("Invalid arguments: {0}", e);
+                Help(options);
             }
         }
 
         public void Show() => MainMenu();
+
+        private void Help(OptionSet options)
+        {
+            string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
+            System.Console.WriteLine();
+            System.Console.WriteLine(string.Format("ExeToBat {0}", version));
+            System.Console.WriteLine();
+            System.Console.WriteLine("From github.com/clragon/ExeToBat");
+            System.Console.WriteLine("Licensed under GNUPL v3");
+            System.Console.WriteLine();
+            System.Console.WriteLine("Usage:");
+            options.WriteOptionDescriptions(System.Console.Out);
+        }
 
         private void MainMenu()
         {
@@ -110,7 +124,7 @@ namespace ExeToBat
                     }
                     catch (IOException e)
                     {
-                        System.Console.Write("Failed to save config: {0}", e);
+                        System.Console.WriteLine("Failed to save config:\n{0}", e.Message);
                         ResetInput();
                     }
                 }
@@ -138,7 +152,7 @@ namespace ExeToBat
                     }
                     catch (Exception e) when (e is IOException || e is JsonException)
                     {
-                        System.Console.Write("Failed to load config {0}: {1}", input, e);
+                        System.Console.WriteLine("Failed to load config {0}:\n{1}", input, e.Message);
                         ResetInput();
                     }
                 }
@@ -463,7 +477,7 @@ namespace ExeToBat
                     System.Console.WriteLine("No files specified");
                     break;
                 case GenerationFailedEvent s:
-                    System.Console.Write("Generation failed with: {0}", s.Error);
+                    System.Console.WriteLine("Generation failed with:\n{0}", s.Error.Message);
                     break;
             }
         }

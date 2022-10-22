@@ -56,7 +56,7 @@ namespace ExeToBat
             }
             catch (OptionException e)
             {
-                System.Console.WriteLine("Invalid arguments: {0}", e);
+                System.Console.WriteLine("Invalid arguments: {0}", e.Message);
                 Help(options);
             }
         }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 
 namespace ExeToBat
 {
@@ -9,12 +10,21 @@ namespace ExeToBat
     {
         public Generator() { }
 
+        public Generator(GeneratorConfig config)
+        {
+            LoadConfig(config);
+        }
+
         public const int ChunkSize = 8000;
 
         public List<SourceFile> Sources = new List<SourceFile>();
 
         public class SourceFile
         {
+            /// <summary>
+            /// Represents a file that is later embedded in a bat.
+            /// </summary>
+            /// <param name="path"></param> The path of the file.
             public SourceFile(string path)
             {
                 Path = path;
@@ -32,6 +42,48 @@ namespace ExeToBat
             {
                 return string.Format($"res_{new Random().Next(1000, 10000)}.b64");
             }
+        }
+
+        public class GeneratorConfig
+        {
+            /// <summary>
+            /// The configuration for a Generator.
+            /// </summary>
+            /// <param name="sources"></param>
+            public GeneratorConfig(List<SourceFile> sources)
+            {
+                Sources = sources;
+            }
+
+            public List<SourceFile> Sources { get; private set; }
+
+            public string ToJson()
+            {
+                return JsonSerializer.Serialize(this);
+            }
+
+            public static GeneratorConfig FromJson(string raw)
+            {
+                return JsonSerializer.Deserialize<GeneratorConfig>(raw);
+            }
+        }
+
+        /// <summary>
+        /// Exports the variables of this Generator as a configuration.
+        /// </summary>
+        /// <returns></returns>
+        public GeneratorConfig SaveConfig()
+        {
+            return new GeneratorConfig(Sources);
+        }
+
+        /// <summary>
+        /// Loads a configuration into this Generator.
+        /// </summary>
+        /// <param name="config"></param>
+        public void LoadConfig(GeneratorConfig config)
+        {
+            Sources = config.Sources;
         }
 
         /// <summary>
@@ -150,7 +202,7 @@ namespace ExeToBat
 
         public abstract class GeneratorEvent : EventArgs { }
 
-        public class GeneratorFileEvent : GeneratorEvent
+        public abstract class GeneratorFileEvent : GeneratorEvent
         {
             public SourceFile File { get; protected set; }
         }

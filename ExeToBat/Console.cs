@@ -4,22 +4,70 @@ using System.Collections.Generic;
 using System.Linq;
 using static ExeToBat.Generator;
 using static System.ConsoleUtils;
+using Mono.Options;
+using System.Text.Json;
 
 namespace ExeToBat
 {
     class Console
     {
-        static void Main() => new Console().MainMenu();
+        static void Main(string[] args) => new Console().Show(args);
 
         public Console() { }
 
         private readonly Generator generator = new Generator();
+
+        public void Show(string[] args)
+        {
+            string config = null;
+            bool help = false;
+
+            OptionSet options = new OptionSet()
+            {
+                { "c|config=", "the config file used for automatic generation", v => config = v },
+                { "h|help", "show this message and exit", v => help = v != null },
+            };
+
+            try
+            {
+                List<string> extra = options.Parse(args);
+                if (help)
+                {
+                    options.WriteOptionDescriptions(System.Console.Out);
+                }
+                else if (config != null)
+                {
+                    try
+                    {
+                        generator.LoadConfig(GeneratorConfig.FromJson(File.ReadAllText(config)));
+                        Generate(interactive: false);
+                    }
+                    catch (Exception e) when (e is IOException || e is JsonException)
+                    {
+                        System.Console.Write("Failed to load config {0}: {1}", config, e);
+                    }
+                }
+                else
+                {
+                    MainMenu();
+                }
+            }
+            catch (OptionException e)
+            {
+                System.Console.Write("Invalid arguments: {0}", e);
+                options.WriteOptionDescriptions(System.Console.Out);
+            }
+        }
+
+        public void Show() => MainMenu();
 
         private void MainMenu()
         {
             Dictionary<string, Action> options = new Dictionary<string, Action>
             {
                 { "Files", ChooseSource },
+                { "Save config", SaveConfig },
+                { "Load config", LoadConfig },
                 { "Generate", Generate },
             };
 
@@ -37,6 +85,64 @@ namespace ExeToBat
                 },
                 ExitEntry = "Exit",
             }.Show();
+        }
+
+        private void SaveConfig()
+        {
+            bool IsInputValid = false;
+            while (!IsInputValid)
+            {
+                System.Console.Clear();
+                System.Console.WriteLine("ExeToBat > Config > Save");
+                System.Console.WriteLine();
+                System.Console.Write("{0}> ", "Output File");
+                string input = System.Console.ReadLine();
+
+                input.Trim();
+                input = input.Replace("\"", "");
+                if (!string.IsNullOrEmpty(input))
+                {
+                    try
+                    {
+                        File.WriteAllText(input, generator.SaveConfig().ToJson());
+                        IsInputValid = true;
+                    }
+                    catch (IOException e)
+                    {
+                        System.Console.Write("Failed to save config: {0}", e);
+                        ResetInput();
+                    }
+                }
+            }
+        }
+
+        private void LoadConfig()
+        {
+            bool IsInputValid = false;
+            while (!IsInputValid)
+            {
+                System.Console.Clear();
+                System.Console.WriteLine("ExeToBat > Config > Load");
+                System.Console.WriteLine();
+                System.Console.Write("{0}> ", "Config File");
+                string input = System.Console.ReadLine();
+
+                input.Trim();
+                input = input.Replace("\"", "");
+                if (!string.IsNullOrEmpty(input))
+                {
+                    try
+                    {
+                        generator.LoadConfig(GeneratorConfig.FromJson(File.ReadAllText(input)));
+                        IsInputValid = true;
+                    }
+                    catch (Exception e) when (e is IOException || e is JsonException)
+                    {
+                        System.Console.Write("Failed to load config {0}: {1}", input, e);
+                        ResetInput();
+                    }
+                }
+            }
         }
 
         private void ChooseSource()
@@ -79,35 +185,32 @@ namespace ExeToBat
             {
                 System.Console.Clear();
                 System.Console.WriteLine("ExeToBat > Files > Add");
-                System.Console.Write("\n");
+                System.Console.WriteLine();
                 System.Console.Write("{0}> ", "File/Folder");
                 string input = System.Console.ReadLine();
 
                 input.Trim();
                 input = input.Replace("\"", "");
-                if (!string.IsNullOrEmpty(input))
+                switch (input)
                 {
-                    switch (input)
-                    {
-                        case var i when Directory.Exists(i):
-                            IsInputValid = true;
-                            foreach (string file in Directory.GetFiles(input))
-                            {
-                                generator.Sources.Add(new SourceFile(file));
-                            }
-                            break;
-                        case var i when File.Exists(i):
-                            IsInputValid = true;
-                            generator.Sources.Add(new SourceFile(input));
-                            break;
-                        default:
-                            ResetInput();
-                            break;
-                    }
-                }
-                else
-                {
-                    IsInputValid = true;
+                    case var i when string.IsNullOrEmpty(i):
+                        IsInputValid = true;
+                        break;
+                    case var i when Directory.Exists(i):
+                        IsInputValid = true;
+                        foreach (string file in Directory.GetFiles(input))
+                        {
+                            generator.Sources.Add(new SourceFile(file));
+                        }
+                        break;
+                    case var i when File.Exists(i):
+                        IsInputValid = true;
+                        generator.Sources.Add(new SourceFile(input));
+                        break;
+
+                    default:
+                        ResetInput();
+                        break;
                 }
             }
         }
@@ -297,7 +400,9 @@ namespace ExeToBat
             }
         }
 
-        private void Generate()
+        private void Generate() => Generate(true);
+
+        private void Generate(bool interactive)
         {
             System.Console.Clear();
             System.Console.WriteLine("ExeToBat > Generate");
@@ -308,8 +413,11 @@ namespace ExeToBat
 
             generator.Generation -= OnGenerate;
 
-            System.Console.WriteLine("Press anything...");
-            System.Console.ReadKey();
+            if (interactive)
+            {
+                System.Console.WriteLine("Press anything...");
+                System.Console.ReadKey();
+            }
         }
 
         private void OnGenerate(object sender, GeneratorEvent e)
@@ -318,6 +426,7 @@ namespace ExeToBat
             {
                 case GenerationStartEvent s:
                     System.Console.WriteLine("Starting generation...");
+                    System.Console.WriteLine("Config file: {0}", "no config file");
                     System.Console.WriteLine("{0} files scheduled", s.Files.Count);
                     break;
                 case ReadingFileEvent s:
@@ -354,7 +463,7 @@ namespace ExeToBat
                     System.Console.WriteLine("No files specified");
                     break;
                 case GenerationFailedEvent s:
-                    System.Console.Write("Generation failed with: {0}", s.Error.ToString());
+                    System.Console.Write("Generation failed with: {0}", s.Error);
                     break;
             }
         }

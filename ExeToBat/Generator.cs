@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace ExeToBat
 {
@@ -17,7 +13,7 @@ namespace ExeToBat
 
         public const int ChunkSize = 8000;
 
-        public List<SourceFile> Sources = new List<SourceFile>();
+        public List<SourceFile> Sources = new();
 
         public class SourceFile
         {
@@ -64,7 +60,8 @@ namespace ExeToBat
 
             public static GeneratorConfig FromJson(string raw)
             {
-                return JsonSerializer.Deserialize<GeneratorConfig>(raw);
+                return JsonSerializer.Deserialize<GeneratorConfig>(raw)
+                    ?? new GeneratorConfig(new());
             }
         }
 
@@ -89,11 +86,11 @@ namespace ExeToBat
         /// <summary>
         /// Sends progress updates about ongoing generation task.
         /// </summary>
-        public event EventHandler<GeneratorEvent> Generation;
+        public event EventHandler<GeneratorEvent>? Generation;
 
         protected virtual void OnGeneration(GeneratorEvent e)
         {
-            EventHandler<GeneratorEvent> handler = Generation;
+            EventHandler<GeneratorEvent>? handler = Generation;
             handler?.Invoke(this, e);
         }
 
@@ -105,94 +102,92 @@ namespace ExeToBat
         {
             if (Sources.Any())
             {
-                using (StreamWriter writer = new StreamWriter(outputFile))
+                using StreamWriter writer = new(outputFile);
+                OnGeneration(new GenerationStartEvent(Sources));
+                writer.WriteLine("@echo off");
+                writer.WriteLine(":: Auto-generated batch file by ExeToBat ::");
+                writer.WriteLine("");
+
+                foreach (SourceFile source in Sources)
                 {
-                    OnGeneration(new GenerationStartEvent(Sources));
-                    writer.WriteLine("@echo off");
-                    writer.WriteLine(":: Auto-generated batch file by ExeToBat ::");
-                    writer.WriteLine("");
+                    OnGeneration(new ReadingFileEvent(source));
+                    List<string> fileChunks = Convert
+                        .ToBase64String(File.ReadAllBytes(source.Path))
+                        .Chunks(ChunkSize)
+                        .ToList();
+                    string tempFile = Path.Combine("%temp%", source.Resource);
+                    writer.WriteLine("(");
 
-                    foreach (SourceFile source in Sources)
+                    int pos = 0;
+                    foreach (string part in fileChunks)
                     {
-                        OnGeneration(new ReadingFileEvent(source));
-                        List<string> fileChunks = Convert
-                            .ToBase64String(File.ReadAllBytes(source.Path))
-                            .Chunks(ChunkSize)
-                            .ToList();
-                        string tempFile = Path.Combine("%temp%", source.Resource);
-                        writer.WriteLine("(");
-
-                        int pos = 0;
-                        foreach (string part in fileChunks)
-                        {
-                            pos++;
-                            OnGeneration(new WritingFilePartEvent(source, pos, fileChunks.Count));
-                            writer.WriteLine(string.Format("echo {0}", part));
-                        }
-
-                        writer.WriteLine(string.Format(") >> \"{0}\"", tempFile));
-                        writer.WriteLine("");
-
-                        OnGeneration(new WritingFileDecoderEvent(source));
-                        writer.WriteLine(
-                            string.Format(
-                                "certutil -decode \"{0}\" \"{1}\" >nul 2>&1",
-                                tempFile,
-                                Path.Combine(source.Directory, Path.GetFileName(source.Path))
-                            )
-                        );
-                        writer.WriteLine(string.Format("del /f /q \"{0}\" >nul 2>&1", tempFile));
-                        writer.WriteLine("");
-
-                        if (source.Execute)
-                        {
-                            string wait;
-                            if (source.Wait)
-                            {
-                                wait = " /wait";
-                            }
-                            else
-                            {
-                                wait = " ";
-                            }
-
-                            OnGeneration(new WritingFileExecuteEvent(source));
-                            writer.WriteLine(
-                                string.Format(
-                                    "start{0} \"\" \"cmd /c {1}\" {2}",
-                                    wait,
-                                    Path.Combine(source.Directory, Path.GetFileName(source.Path)),
-                                    source.Parameters
-                                )
-                            );
-                            if (source.Wait)
-                            {
-                                OnGeneration(new WritingFileWaitEvent(source));
-                                if (source.Delete)
-                                {
-                                    OnGeneration(new WritingFileDeleteEvent(source));
-                                    writer.WriteLine(
-                                        string.Format(
-                                            "del /f /q \"{0}\" >nul 2>&1",
-                                            Path.Combine(
-                                                source.Directory,
-                                                Path.GetFileName(source.Path)
-                                            )
-                                        )
-                                    );
-                                    writer.WriteLine("");
-                                }
-                            }
-
-                            writer.WriteLine("");
-                        }
-
-                        writer.Flush();
-                        OnGeneration(new WritingFileCompleteEvent(source));
+                        pos++;
+                        OnGeneration(new WritingFilePartEvent(source, pos, fileChunks.Count));
+                        writer.WriteLine(string.Format("echo {0}", part));
                     }
 
-                    OnGeneration(new GenerationCompleteEvent(outputFile));
+                    writer.WriteLine(string.Format(") >> \"{0}\"", tempFile));
+                    writer.WriteLine("");
+
+                    OnGeneration(new WritingFileDecoderEvent(source));
+                    writer.WriteLine(
+                        string.Format(
+                            "certutil -decode \"{0}\" \"{1}\" >nul 2>&1",
+                            tempFile,
+                            Path.Combine(source.Directory, Path.GetFileName(source.Path))
+                        )
+                    );
+                    writer.WriteLine(string.Format("del /f /q \"{0}\" >nul 2>&1", tempFile));
+                    writer.WriteLine("");
+
+                    if (source.Execute)
+                    {
+                        string wait;
+                        if (source.Wait)
+                        {
+                            wait = " /wait";
+                        }
+                        else
+                        {
+                            wait = " ";
+                        }
+
+                        OnGeneration(new WritingFileExecuteEvent(source));
+                        writer.WriteLine(
+                            string.Format(
+                                "start{0} \"\" \"cmd /c {1}\" {2}",
+                                wait,
+                                Path.Combine(source.Directory, Path.GetFileName(source.Path)),
+                                source.Parameters
+                            )
+                        );
+                        if (source.Wait)
+                        {
+                            OnGeneration(new WritingFileWaitEvent(source));
+                            if (source.Delete)
+                            {
+                                OnGeneration(new WritingFileDeleteEvent(source));
+                                writer.WriteLine(
+                                    string.Format(
+                                        "del /f /q \"{0}\" >nul 2>&1",
+                                        Path.Combine(
+                                            source.Directory,
+                                            Path.GetFileName(source.Path)
+                                        )
+                                    )
+                                );
+                                writer.WriteLine("");
+                            }
+                        }
+
+                        writer.WriteLine("");
+                    }
+
+                    writer.Flush();
+                    OnGeneration(new WritingFileCompleteEvent(source));
                 }
+
+                OnGeneration(new GenerationCompleteEvent(outputFile));
             }
             else
             {
@@ -204,7 +199,12 @@ namespace ExeToBat
 
         public abstract class GeneratorFileEvent : GeneratorEvent
         {
-            public SourceFile File { get; protected set; }
+            public GeneratorFileEvent(SourceFile file)
+            {
+                File = file;
+            }
+
+            public SourceFile File { get; private set; }
         }
 
         public class GenerationStartEvent : GeneratorEvent
@@ -219,17 +219,13 @@ namespace ExeToBat
 
         public class ReadingFileEvent : GeneratorFileEvent
         {
-            public ReadingFileEvent(SourceFile file)
-            {
-                File = file;
-            }
+            public ReadingFileEvent(SourceFile file) : base(file) { }
         }
 
         public class WritingFilePartEvent : GeneratorFileEvent
         {
-            public WritingFilePartEvent(SourceFile file, int part, int max)
+            public WritingFilePartEvent(SourceFile file, int part, int max) : base(file)
             {
-                File = file;
                 Part = part;
                 Max = max;
             }
@@ -240,42 +236,27 @@ namespace ExeToBat
 
         public class WritingFileDecoderEvent : GeneratorFileEvent
         {
-            public WritingFileDecoderEvent(SourceFile file)
-            {
-                File = file;
-            }
+            public WritingFileDecoderEvent(SourceFile file) : base(file) { }
         }
 
         public class WritingFileExecuteEvent : GeneratorFileEvent
         {
-            public WritingFileExecuteEvent(SourceFile file)
-            {
-                File = file;
-            }
+            public WritingFileExecuteEvent(SourceFile file) : base(file) { }
         }
 
         public class WritingFileWaitEvent : GeneratorFileEvent
         {
-            public WritingFileWaitEvent(SourceFile file)
-            {
-                File = file;
-            }
+            public WritingFileWaitEvent(SourceFile file) : base(file) { }
         }
 
         public class WritingFileDeleteEvent : GeneratorFileEvent
         {
-            public WritingFileDeleteEvent(SourceFile file)
-            {
-                File = file;
-            }
+            public WritingFileDeleteEvent(SourceFile file) : base(file) { }
         }
 
         public class WritingFileCompleteEvent : GeneratorFileEvent
         {
-            public WritingFileCompleteEvent(SourceFile file)
-            {
-                File = file;
-            }
+            public WritingFileCompleteEvent(SourceFile file) : base(file) { }
         }
 
         public class GenerationCompleteEvent : GeneratorEvent

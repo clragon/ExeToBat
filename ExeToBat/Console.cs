@@ -1,8 +1,4 @@
-﻿using System;
-using System.IO;
-using System.Collections.Generic;
-using System.Linq;
-using static ExeToBat.Generator;
+﻿using static ExeToBat.Generator;
 using static System.ConsoleUtils;
 using Mono.Options;
 using System.Text.Json;
@@ -11,22 +7,27 @@ namespace ExeToBat
 {
     class Console
     {
-        static void Main(string[] args) => new Console().Show(args);
+        public static void Main(string[] args) => new Console().Show(args);
 
         public Console() { }
 
-        private readonly Generator generator = new Generator();
+        private readonly Generator generator = new();
 
         public void Show(string[] args)
         {
-            string config = null;
+            string? config = null;
             bool help = false;
 
-            OptionSet options = new OptionSet()
-            {
-                { "c|config=", "the config file used for automatic generation", v => config = v },
-                { "h|help", "show this message and exit", v => help = v != null },
-            };
+            OptionSet options =
+                new()
+                {
+                    {
+                        "c|config=",
+                        "the config file used for automatic generation",
+                        v => config = v
+                    },
+                    { "h|help", "show this message and exit", v => help = v != null },
+                };
 
             try
             {
@@ -63,13 +64,14 @@ namespace ExeToBat
 
         private void MainMenu()
         {
-            Dictionary<string, Action> options = new Dictionary<string, Action>
-            {
-                { "Files", ChooseSource },
-                { "Save config", SaveConfig },
-                { "Load config", LoadConfig },
-                { "Generate", Generate },
-            };
+            Dictionary<string, Action> options =
+                new()
+                {
+                    { "Files", ChooseSource },
+                    { "Save config", SaveConfig },
+                    { "Load config", LoadConfig },
+                    { "Generate", Generate },
+                };
 
             new ListMenu<string>(options.Keys.ToList())
             {
@@ -96,10 +98,9 @@ namespace ExeToBat
                 System.Console.WriteLine("ExeToBat > Config > Save");
                 System.Console.WriteLine();
                 System.Console.Write("{0}> ", "Output File");
-                string input = System.Console.ReadLine();
+                string? input = System.Console.ReadLine();
 
-                input.Trim();
-                input = input.Replace("\"", "");
+                input = input?.Trim()?.Replace("\"", "");
                 if (!string.IsNullOrEmpty(input))
                 {
                     try
@@ -125,10 +126,9 @@ namespace ExeToBat
                 System.Console.WriteLine("ExeToBat > Config > Load");
                 System.Console.WriteLine();
                 System.Console.Write("{0}> ", "Config File");
-                string input = System.Console.ReadLine();
+                string? input = System.Console.ReadLine();
 
-                input.Trim();
-                input = input.Replace("\"", "");
+                input = input?.Trim()?.Replace("\"", "");
                 if (!string.IsNullOrEmpty(input))
                 {
                     try
@@ -187,10 +187,9 @@ namespace ExeToBat
                 System.Console.WriteLine("ExeToBat > Files > Add");
                 System.Console.WriteLine();
                 System.Console.Write("{0}> ", "File/Folder");
-                string input = System.Console.ReadLine();
+                string? input = System.Console.ReadLine();
 
-                input.Trim();
-                input = input.Replace("\"", "");
+                input = input?.Trim()?.Replace("\"", "");
                 switch (input)
                 {
                     case var i when string.IsNullOrEmpty(i):
@@ -198,14 +197,14 @@ namespace ExeToBat
                         break;
                     case var i when Directory.Exists(i):
                         IsInputValid = true;
-                        foreach (string file in Directory.GetFiles(input))
+                        foreach (string file in Directory.GetFiles(i))
                         {
                             generator.Sources.Add(new SourceFile(file));
                         }
                         break;
                     case var i when File.Exists(i):
                         IsInputValid = true;
-                        generator.Sources.Add(new SourceFile(input));
+                        generator.Sources.Add(new SourceFile(i));
                         break;
 
                     default:
@@ -217,33 +216,34 @@ namespace ExeToBat
 
         private void ManageSource(SourceFile source)
         {
-            Dictionary<string, Func<bool>> options = new Dictionary<string, Func<bool>>
-            {
+            Dictionary<string, Func<bool>> options =
+                new()
                 {
-                    "Edit",
-                    () =>
                     {
-                        ModifySource(source);
-                        return false;
-                    }
-                },
-                {
-                    "Position",
-                    () =>
+                        "Edit",
+                        () =>
+                        {
+                            ModifySource(source);
+                            return false;
+                        }
+                    },
                     {
-                        EditPosition(source);
-                        return false;
-                    }
-                },
-                {
-                    "Delete",
-                    () =>
+                        "Position",
+                        () =>
+                        {
+                            EditPosition(source);
+                            return false;
+                        }
+                    },
                     {
-                        generator.Sources.Remove(source);
-                        return true;
-                    }
-                },
-            };
+                        "Delete",
+                        () =>
+                        {
+                            generator.Sources.Remove(source);
+                            return true;
+                        }
+                    },
+                };
 
             new ListMenu<string>(options.Keys.ToList())
             {
@@ -262,16 +262,17 @@ namespace ExeToBat
         {
             List<(string, string, Action)> options()
             {
-                List<(string, string, Action)> result = new List<(string, string, Action)>()
-                {
-                    ("File", source.Path, () => { }),
-                    ("Extraction directory", source.Directory, () => EditExtraction(source)),
-                    (
-                        "Execute after extraction",
-                        source.Execute.ToString(),
-                        () => source.Execute = !source.Execute
-                    ),
-                };
+                List<(string, string, Action)> result =
+                    new()
+                    {
+                        ("File", source.Path, () => { }),
+                        ("Extraction directory", source.Directory, () => EditExtraction(source)),
+                        (
+                            "Execute after extraction",
+                            source.Execute.ToString(),
+                            () => source.Execute = !source.Execute
+                        ),
+                    };
                 if (source.Execute)
                 {
                     result.Add(("Parameters", source.Parameters, () => EditParameters(source)));
@@ -331,7 +332,7 @@ namespace ExeToBat
             System.Console.WriteLine("https://ss64.com/nt/syntax-args.html");
             System.Console.WriteLine();
             System.Console.Write("{0}> ", "Directory");
-            string input = System.Console.ReadLine();
+            string? input = System.Console.ReadLine();
 
             if (!string.IsNullOrEmpty(input))
             {
@@ -348,9 +349,9 @@ namespace ExeToBat
             );
             System.Console.WriteLine();
             System.Console.Write("{0}> ", "Parameters");
-            string input = System.Console.ReadLine();
+            string? input = System.Console.ReadLine();
 
-            input.Trim();
+            input = input?.Trim();
             if (!string.IsNullOrEmpty(input))
             {
                 source.Parameters = input;
@@ -371,7 +372,7 @@ namespace ExeToBat
 
                 System.Console.WriteLine();
                 System.Console.Write("{0}> ", "New index");
-                string input = System.Console.ReadLine();
+                string? input = System.Console.ReadLine();
 
                 if (int.TryParse(input, out int index))
                 {
@@ -420,13 +421,12 @@ namespace ExeToBat
             }
         }
 
-        private void OnGenerate(object sender, GeneratorEvent e)
+        private void OnGenerate(object? sender, GeneratorEvent e)
         {
             switch (e)
             {
                 case GenerationStartEvent s:
                     System.Console.WriteLine("Starting generation...");
-                    System.Console.WriteLine("Config file: {0}", "no config file");
                     System.Console.WriteLine("{0} files scheduled", s.Files.Count);
                     break;
                 case ReadingFileEvent s:

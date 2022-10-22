@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-
-namespace System
+﻿namespace System
 {
     public static class ConsoleUtils
     {
